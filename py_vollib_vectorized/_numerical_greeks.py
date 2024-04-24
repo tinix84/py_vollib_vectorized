@@ -3,7 +3,7 @@ import numpy as np
 from py_vollib_vectorized.util.jit_helper import maybe_jit
 from ._model_calls import black, black_scholes, black_scholes_merton
 
-dS = .01
+dS = 1e-6
 
 #### BLACK
 
@@ -105,8 +105,8 @@ def numerical_delta_black_scholes(flags, Ss, Ks, ts, rs, sigmas, bs):
                 if flag < 0:  # put option
                     delta = -1.0
         else:
-            delta = (black_scholes(flag, S + dS, K, t, r, sigma) - black_scholes(flag, S - dS, K, t, r, sigma)) / (
-                    2 * dS)
+            delta = (black_scholes(flag, S*(1+dS), K, t, r, sigma) - black_scholes(flag, S*(1-dS), K, t, r, sigma)) / (
+                    2 * S*dS)
         deltas.append(delta)
     return deltas
 
