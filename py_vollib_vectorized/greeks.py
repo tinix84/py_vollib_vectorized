@@ -2,11 +2,15 @@ import numpy as np
 import pandas as pd
 
 from ._numerical_greeks import numerical_delta_black, numerical_theta_black, \
-    numerical_vega_black, numerical_rho_black, numerical_gamma_black
+    numerical_vega_black, numerical_rho_black, numerical_gamma_black,\
+    numerical_charm_black, numerical_vanna_black
 from ._numerical_greeks import numerical_delta_black_scholes, numerical_theta_black_scholes, \
-    numerical_vega_black_scholes, numerical_rho_black_scholes, numerical_gamma_black_scholes
+    numerical_vega_black_scholes, numerical_rho_black_scholes, numerical_gamma_black_scholes,\
+    numerical_charm_black_scholes, numerical_vanna_black_scholes
 from ._numerical_greeks import numerical_delta_black_scholes_merton, numerical_theta_black_scholes_merton, \
-    numerical_vega_black_scholes_merton, numerical_rho_black_scholes_merton, numerical_gamma_black_scholes_merton
+    numerical_vega_black_scholes_merton, numerical_rho_black_scholes_merton, numerical_gamma_black_scholes_merton,\
+    numerical_charm_black_scholes_merton, numerical_vanna_black_scholes_merton
+
 from .util.data_format import _preprocess_flags, maybe_format_data_and_broadcast, _validate_data
 
 def delta(flag, S, K, t, r, sigma, q=None, *, model="black_scholes", return_as="dataframe", dtype=np.float64):
@@ -314,3 +318,67 @@ def gamma(flag, S, K, t, r, sigma, q=None, *,  model="black_scholes", return_as=
     elif return_as == "dataframe":
         return pd.DataFrame(gamma, columns=["gamma"])
     return gamma
+
+
+def vanna(flag, S, K, t, r, sigma, q=None, *, model="black_scholes", return_as="dataframe", dtype=np.float64):
+    """
+    Return the Vanna of a contract (∂²V / ∂S∂σ), as specified by the pricing model `model`.
+    """
+    flag = _preprocess_flags(flag, dtype=dtype)
+    S, K, t, r, sigma, flag = maybe_format_data_and_broadcast(S, K, t, r, sigma, flag, dtype=dtype)
+    _validate_data(flag, S, K, t, r, sigma)
+
+    if model == "black":
+        b = 0
+        vanna_ = numerical_vanna_black(flag, S, K, t, r, sigma, b)
+    elif model == "black_scholes":
+        b = r
+        vanna_ = numerical_vanna_black_scholes(flag, S, K, t, r, sigma, b)
+    elif model == "black_scholes_merton":
+        if q is None:
+            raise ValueError("Must pass a `q` to black scholes merton model (annualized continuous dividend yield).")
+        S, K, t, r, sigma, q = maybe_format_data_and_broadcast(S, K, t, r, sigma, q, dtype=dtype)
+        _validate_data(r, q)
+        b = r - q
+        vanna_ = numerical_vanna_black_scholes_merton(flag, S, K, t, r, sigma, b)
+    else:
+        raise ValueError("Model must be one of: `black`, `black_scholes`, `black_scholes_merton`")
+
+    vanna_ = np.ascontiguousarray(vanna_)
+    if return_as == "series":
+        return pd.Series(vanna_, name="vanna")
+    elif return_as == "dataframe":
+        return pd.DataFrame(vanna_, columns=["vanna"])
+    return vanna_
+
+
+def charm(flag, S, K, t, r, sigma, q=None, *, model="black_scholes", return_as="dataframe", dtype=np.float64):
+    """
+    Return the Charm of a contract (∂²V / ∂S∂t), as specified by the pricing model `model`.
+    """
+    flag = _preprocess_flags(flag, dtype=dtype)
+    S, K, t, r, sigma, flag = maybe_format_data_and_broadcast(S, K, t, r, sigma, flag, dtype=dtype)
+    _validate_data(flag, S, K, t, r, sigma)
+
+    if model == "black":
+        b = 0
+        charm_ = numerical_charm_black(flag, S, K, t, r, sigma, b)
+    elif model == "black_scholes":
+        b = r
+        charm_ = numerical_charm_black_scholes(flag, S, K, t, r, sigma, b)
+    elif model == "black_scholes_merton":
+        if q is None:
+            raise ValueError("Must pass a `q` to black scholes merton model (annualized continuous dividend yield).")
+        S, K, t, r, sigma, q = maybe_format_data_and_broadcast(S, K, t, r, sigma, q, dtype=dtype)
+        _validate_data(r, q)
+        b = r - q
+        charm_ = numerical_charm_black_scholes_merton(flag, S, K, t, r, sigma, b)
+    else:
+        raise ValueError("Model must be one of: `black`, `black_scholes`, `black_scholes_merton`")
+
+    charm_ = np.ascontiguousarray(charm_)
+    if return_as == "series":
+        return pd.Series(charm_, name="charm")
+    elif return_as == "dataframe":
+        return pd.DataFrame(charm_, columns=["charm"])
+    return charm_
