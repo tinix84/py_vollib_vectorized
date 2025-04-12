@@ -82,6 +82,37 @@ def numerical_gamma_black(flags, Fs, Ks, ts, rs, sigmas):
         gammas.append(gamma)
     return gammas
 
+@maybe_jit()
+def numerical_vanna_black(flags, Ss, Ks, ts, rs, sigmas, bs):
+    vanna = []
+    for flag, S, K, t, r, sigma, b in zip(flags, Ss, Ks, ts, rs, sigmas, bs):
+        price_upS_upSigma = black(flag, S*(1+dS), K, t, r, sigma)
+        price_upS_downSigma = black(flag, S*(1+dS), K, t, r, sigma - dSigma)
+        price_downS_upSigma = black(flag, S*(1-dS), K, t, r, sigma + dSigma)
+        price_downS_downSigma = black(flag, S*(1-dS), K, t, r, sigma - dSigma)
+
+        value = (price_upS_upSigma - price_upS_downSigma - price_downS_upSigma + price_downS_downSigma) / (4 * dS * S * dSigma)
+        vanna.append(value)
+    return vanna
+
+@maybe_jit()
+def numerical_charm_black(flags, Ss, Ks, ts, rs, sigmas, bs):
+    charm = []
+    for flag, S, K, t, r, sigma, b in zip(flags, Ss, Ks, ts, rs, sigmas, bs):
+        if t <= 1. / 365.:
+            charm.append(0.0)
+            continue
+
+        delta_t_minus = (black(flag, S*(1+dS), K, t - 1./365., r, sigma) -
+                         black(flag, S*(1-dS), K, t - 1./365., r, sigma)) / (2 * dS * S)
+
+        delta_t_now = (black(flag, S*(1+dS), K, t, r, sigma) -
+                       black(flag, S*(1-dS), K, t, r, sigma)) / (2 * dS * S)
+
+        value = (delta_t_minus - delta_t_now) / (1. / 365.)
+        charm.append(value)
+    return charm
+
 #### BLACK SCHOLES
 
 @maybe_jit()
@@ -159,8 +190,40 @@ def numerical_gamma_black_scholes(flags, Ss, Ks, ts, rs, sigmas, bs):
     return gammas
 
 
-### BLACK SCHOLES MERTON
+@maybe_jit()
+def numerical_vanna_black_scholes(flags, Ss, Ks, ts, rs, sigmas, bs):
+    vanna = []
+    for flag, S, K, t, r, sigma, b in zip(flags, Ss, Ks, ts, rs, sigmas, bs):
+        price_upS_upSigma = black_scholes(flag, S*(1+dS), K, t, r, sigma + dSigma)
+        price_upS_downSigma = black_scholes(flag, S*(1+dS), K, t, r, sigma - dSigma)
+        price_downS_upSigma = black_scholes(flag, S*(1-dS), K, t, r, sigma + dSigma)
+        price_downS_downSigma = black_scholes(flag, S*(1-dS), K, t, r, sigma - dSigma)
 
+        value = (price_upS_upSigma - price_upS_downSigma - price_downS_upSigma + price_downS_downSigma) / (4 * dS * S * dSigma)
+        vanna.append(value)
+    return vanna
+
+
+@maybe_jit()
+def numerical_charm_black_scholes(flags, Ss, Ks, ts, rs, sigmas, bs):
+    charm = []
+    for flag, S, K, t, r, sigma, b in zip(flags, Ss, Ks, ts, rs, sigmas, bs):
+        if t <= 1. / 365.:
+            charm.append(0.0)
+            continue
+
+        delta_t_minus = (black_scholes(flag, S*(1+dS), K, t - 1./365., r, sigma) -
+                         black_scholes(flag, S*(1-dS), K, t - 1./365., r, sigma)) / (2 * dS * S)
+
+        delta_t_now = (black_scholes(flag, S*(1+dS), K, t, r, sigma) -
+                       black_scholes(flag, S*(1-dS), K, t, r, sigma)) / (2 * dS * S)
+
+        value = (delta_t_minus - delta_t_now) / (1. / 365.)
+        charm.append(value)
+    return charm
+
+
+### BLACK SCHOLES MERTON
 
 @maybe_jit()
 def numerical_delta_black_scholes_merton(flags, Ss, Ks, ts, rs, sigmas, bs):
@@ -251,3 +314,35 @@ def numerical_gamma_black_scholes_merton(flags, Ss, Ks, ts, rs, sigmas, bs):
 
         gammas.append(gamma)
     return gammas
+
+
+@maybe_jit()
+def numerical_vanna_black_scholes_merton(flags, Ss, Ks, ts, rs, sigmas, bs):
+    vanna = []
+    for flag, S, K, t, r, sigma, b in zip(flags, Ss, Ks, ts, rs, sigmas, bs):
+        price_upS_upSigma = black_scholes_merton(flag, S*(1+dS), K, t, r, sigma + dSigma, r - b)
+        price_upS_downSigma = black_scholes_merton(flag, S*(1+dS), K, t, r, sigma - dSigma, r - b)
+        price_downS_upSigma = black_scholes_merton(flag, S*(1-dS), K, t, r, sigma + dSigma, r - b)
+        price_downS_downSigma = black_scholes_merton(flag, S*(1-dS), K, t, r, sigma - dSigma, r - b)
+        
+        value = (price_upS_upSigma - price_upS_downSigma - price_downS_upSigma + price_downS_downSigma) / (4 * dS * S * dSigma)
+        vanna.append(value)
+    return vanna
+
+@maybe_jit()
+def numerical_charm_black_scholes_merton(flags, Ss, Ks, ts, rs, sigmas, bs):
+    charm = []
+    for flag, S, K, t, r, sigma, b in zip(flags, Ss, Ks, ts, rs, sigmas, bs):
+        if t <= 1. / 365.:
+            charm.append(0.0)  # Too close to expiry — can be unstable or meaningless
+            continue
+
+        delta_t_minus = (black_scholes_merton(flag, S*(1+dS), K, t - 1./365., r, sigma, r - b) - 
+                         black_scholes_merton(flag, S*(1-dS), K, t - 1./365., r, sigma, r - b)) / (2 * dS * S)
+
+        delta_t_now = (black_scholes_merton(flag, S*(1+dS), K, t, r, sigma, r - b) -
+                       black_scholes_merton(flag, S*(1-dS), K, t, r, sigma, r - b)) / (2 * dS * S)
+
+        value = (delta_t_minus - delta_t_now) / (1. / 365.)
+        charm.append(value)
+    return charm
